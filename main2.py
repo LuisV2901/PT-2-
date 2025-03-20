@@ -99,8 +99,8 @@ class BaseRobot:
         LoadingWindow(self.parent, lambda: self.connection_status)
 
         threading.Thread(target=self.start_server, daemon=True).start() 
-        self.led_state = not self.led_state
-        self.led_label.config(fg="green" if self.led_state else "gray")
+        #self.led_state = not self.led_state
+        #self.led_label.config(fg="green" if self.led_state else "gray")
 
     def start_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -113,7 +113,7 @@ class BaseRobot:
         self.led_label.config(fg="green")
         
     def complete_loading(self):
-        # Se llama cuando la condición se cumple (después de 3 segundos en este ejemplo)
+        
         self.loading_done = True
         print(f"Robot {self.robot_id}: Carga completada.")
     # Métodos de acción que se pueden sobrescribir para cada robot
