@@ -45,10 +45,11 @@ class LoadingWindow:
 
 # Clase base para los robots
 class BaseRobot:
-    def __init__(self, parent, notebook, robot_id):
+    def __init__(self, parent, notebook, robot_id, interface):
         self.parent = parent  # Referencia a la ventana principal, si se necesita
         self.robot_id = robot_id
         self.led_state = False
+        self.interface = interface
         # Crear frame para el robot y agregarlo al notebook
         self.frame = tk.Frame(notebook, bg='white')
         notebook.add(self.frame, text=f"Robot {robot_id}")
@@ -95,31 +96,13 @@ class BaseRobot:
 
     def connection(self):
         self.loading_done = False
-        self.connection_status = False
-        LoadingWindow(self.parent, lambda: self.connection_status)
-
-        threading.Thread(target=self.start_server, daemon=True).start() 
-        #self.led_state = not self.led_state
-        #self.led_label.config(fg="green" if self.led_state else "gray")
-
-    def start_server(self):
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(('localhost', 65432))
-        server_socket.listen()
-        print("Esperando conexión...")
-        client_socket, addr = server_socket.accept()
-        print(f"Conectado a {addr}")
         self.connection_status = True
         self.led_label.config(fg="green")
-        
-    def complete_loading(self):
-        
-        self.loading_done = True
-        print(f"Robot {self.robot_id}: Carga completada.")
+
     # Métodos de acción que se pueden sobrescribir para cada robot
     def start_measurement(self):
         print(f"Robot {self.robot_id}: Iniciar Mediciones")
-
+        self.interface.send_message_to_client(f"Robot {self.robot_id}: Iniciar Mediciones")
     def return_robots(self):
         print(f"Robot {self.robot_id}: Regresar Robots")
 
@@ -142,7 +125,9 @@ class RobotInterface(tk.Tk):
         self.title("Interfaz de Control de Robots")
         self.geometry("1000x700")
         self.configure(bg='white')
-
+        self.server_socket = None
+        self.client_socket = None
+        self.addr = None
         # Notebook para separar cada robot y la ventana general
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
@@ -152,15 +137,17 @@ class RobotInterface(tk.Tk):
         for i in self.id_robots:
             # En este ejemplo, se utiliza RobotEspecial para los robots pares
             if i % 2 == 0:
-                robot = RobotEspecial(self, self.notebook, i)
+                robot = RobotEspecial(self, self.notebook, i, self)
             else:
-                robot = BaseRobot(self, self.notebook, i)
+                robot = BaseRobot(self, self.notebook, i, self)
             self.robots[i] = robot
 
         # Pestaña para la Ventana General
         general_frame = tk.Frame(self.notebook, bg='white')
         self.notebook.add(general_frame, text="General")
-
+        button_style = {'bg': '#002147', 'fg': 'white'}
+        tk.Button(general_frame, text="Iniciar Conexion", command=self.start_connection, **button_style).pack( padx=5, pady=5)
+        tk.Button(general_frame, text="Detener Conexion", command=self.stop, **button_style).pack( padx=5, pady=5)
         # Mapa general
         figure, ax = plt.subplots()
         ax.set_xlim(-30, 30)
@@ -179,6 +166,61 @@ class RobotInterface(tk.Tk):
             general_data_table.heading(col, text=col)
         general_data_table.pack(fill='both', expand=True, padx=5, pady=5)
 
+        #socket_server.start_server()
+    def start_connection(self):
+        print("Iniciando comunicacion")
+        self.host='localhost' 
+        self.port=65432
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen()
+        print(f"Servidor escuchando en {self.host}:{self.port}...")
+        
+        self.client_socket, self.addr = self.server_socket.accept()  # Espera a que un cliente se conecte
+        print(f"Conectado con {self.addr}")
+        threading.Thread(target=self.handle_client, args=(self.client_socket,), daemon=True).start()
+
+    def handle_client(self,client_socket):
+        try:    
+            with client_socket:
+                while True:
+                    data = client_socket.recv(1024)
+                    if not data:
+                        break
+                    message = data.decode()
+                    print(f"Recibido: {message}")
+                    # Verifica si el mensaje tiene el formato correcto (ID:COMANDO)
+
+                    robot_id, command = message.split(':')
+                    robot_id = int(robot_id.strip())
+                    command = command.strip()
+
+                        # Verificar que el ID del robot existe
+                    if robot_id in self.robots:
+                        robot = self.robots[robot_id]
+                            
+                            # Llamar a la función correspondiente según el comando
+                        if command == "CE":
+                            robot.connection()
+                        else:
+                            print(f"Comando desconocido para el robot {robot_id}: {command}")
+                    else:
+                        print(f"ID de robot no válido: {robot_id}")
+                                             
+        except Exception as e:
+            print(f"Error en la conexión con el cliente: {e}")
+    # Función para enviar mensajes al cliente desde el servidor
+    def send_message_to_client(self,message):
+        if message:
+            self.client_socket.sendall(message.encode())
+            print(f"Servidor envió: {message}")
+    
+    def stop(self):
+        self.server_socket.close()
+        if self.client_socket:
+            self.client_socket.close()
+
 if __name__ == "__main__":
+
     app = RobotInterface()
     app.mainloop()
