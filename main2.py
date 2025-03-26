@@ -3,6 +3,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 import pandas as pd
+import re
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 # Clase para la ventana de carga con animación de spinner
@@ -50,14 +51,15 @@ class BaseRobot:
         self.robot_id = robot_id
         self.led_state = False
         self.interface = interface
+        self.loading_done = False  
+        self.location = None
         # Crear frame para el robot y agregarlo al notebook
         self.frame = tk.Frame(notebook, bg='white')
         notebook.add(self.frame, text=f"Robot {robot_id}")
         # Construir la interfaz del robot
-        self.build_ui()
-        self.loading_done = False  # Bandera para la condición de carga
+        self.robot_panel()
 
-    def build_ui(self):
+    def robot_panel(self):
         # Barra superior de controles
         control_frame = tk.Frame(self.frame, bg='#002147')
         control_frame.pack(fill='x')
@@ -70,47 +72,58 @@ class BaseRobot:
         tk.Button(control_frame, text="Regresar Robots", command=self.return_robots, **button_style).pack(side='left', padx=5, pady=5)
         tk.Button(control_frame, text="Solicitar Ubicación", command=self.request_location, **button_style).pack(side='left', padx=5, pady=5)
         tk.Button(control_frame, text="Movimientos Manuales", command=self.manual_movement, **button_style).pack(side='left', padx=5, pady=5)
+        tk.Button(control_frame, text="Checar conexión", command=self.check_connection, **button_style).pack(side='left', padx=5, pady=5)
         
-        tk.Button(control_frame, text="Conectar", command=self.connection, **button_style).pack(side='left', padx=5, pady=5)
         # LED simulado con un Label
         self.led_label = tk.Label(control_frame, text="●", fg="gray", bg='#002147', font=("Helvetica", 20))
         self.led_label.pack(side='left', padx=5, pady=5)
         
         # Canvas de Matplotlib para el plano cartesiano
-        figure, ax = plt.subplots()
+        self.figure, ax = plt.subplots()
         ax.set_xlim(-30, 30)
         ax.set_ylim(-30, 30)
-        ax.plot(0, 0, 'ro')  # Punto rojo en (0,0)
+        self.location, = ax.plot(0, 0, 'ro')
         ax.set_title(f"Posición del Robot {self.robot_id}")
         ax.set_xlabel("Eje X")
         ax.set_ylabel("Eje Y")
-        self.canvas = FigureCanvasTkAgg(figure, master=self.frame)
-        canvas_widget = self.canvas.get_tk_widget()
+        canvas = FigureCanvasTkAgg(self.figure, master=self.frame)
+        canvas_widget = canvas.get_tk_widget()
         canvas_widget.pack(fill='both', expand=True, padx=5, pady=5)
-        
         # Tabla de datos para el robot
         self.data_table = ttk.Treeview(self.frame, columns=("Sensor", "Valor"), show='headings')
         for col in ("Sensor", "Valor"):
             self.data_table.heading(col, text=col)
         self.data_table.pack(fill='both', expand=True, padx=5, pady=5)
 
+    def update_location(self,x,y):
+        self.location.set_data([x], [y])  # Actualizar las coordenadas del punto
+        self.figure.canvas.draw()  # Redibujar el gráfico
+    
     def connection(self):
         self.loading_done = False
         self.connection_status = True
         self.led_label.config(fg="green")
-
+    
     # Métodos de acción que se pueden sobrescribir para cada robot
     def start_measurement(self):
-        print(f"Robot {self.robot_id}: Iniciar Mediciones")
-        self.interface.send_message_to_client(f"Robot {self.robot_id}: Iniciar Mediciones")
+        print(f"Robot {self.robot_id}: Solicitó Mediciones")
+        self.interface.send_message_to_client(f"{self.robot_id}:IM")
+    
     def return_robots(self):
         print(f"Robot {self.robot_id}: Regresar Robots")
+        self.interface.send_message_to_client(f"{self.robot_id}:RR")
 
     def request_location(self):
         print(f"Robot {self.robot_id}: Solicitar Ubicación")
+        self.interface.send_message_to_client(f"{self.robot_id}:SU")
 
     def manual_movement(self):
         print(f"Robot {self.robot_id}: Movimientos Manuales")
+        self.interface.send_message_to_client(f"{self.robot_id}:MM")
+
+    def check_connection(self):
+        print(f"Robot {self.robot_id}: Checar conexión")
+        self.interface.send_message_to_client(f"{self.robot_id}:CC")
 
 # Ejemplo de subclase para un robot que se desempeña de manera especial
 class RobotEspecial(BaseRobot):
@@ -119,17 +132,17 @@ class RobotEspecial(BaseRobot):
         print(f"Robot Especial {self.robot_id}: Iniciando mediciones con parámetros especiales.")
         # Aquí puedes agregar comportamientos adicionales o específicos
 
-class RobotInterface(tk.Tk):
+class RobotInterface():
     def __init__(self):
-        super().__init__()
-        self.title("Interfaz de Control de Robots")
-        self.geometry("1000x700")
-        self.configure(bg='white')
+        self.root = tk.Tk()
+        self.root.title("Interfaz de Control de Robots")
+        self.root.geometry("1000x700")
+        self.root.configure(bg='white')
         self.server_socket = None
         self.client_socket = None
         self.addr = None
         # Notebook para separar cada robot y la ventana general
-        self.notebook = ttk.Notebook(self)
+        self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
 
         self.robots = {}  # Diccionario para almacenar las instancias de cada robot
@@ -149,14 +162,26 @@ class RobotInterface(tk.Tk):
         tk.Button(general_frame, text="Iniciar Conexion", command=self.start_connection, **button_style).pack( padx=5, pady=5)
         tk.Button(general_frame, text="Detener Conexion", command=self.stop, **button_style).pack( padx=5, pady=5)
         # Mapa general
-        figure, ax = plt.subplots()
+        self.figure, ax = plt.subplots()
         ax.set_xlim(-30, 30)
         ax.set_ylim(-30, 30)
-        ax.plot(0, 0, 'ro')  # Punto rojo en (0,0)
+        self.robots_location = {
+            'LR1': ax.plot(0, 0, 'ro')[0],
+            'LR2': ax.plot(0, 0, 'bo')[0],
+            'LR3': ax.plot(0, 0, 'go')[0],
+            'LR4': ax.plot(0, 0, 'o', color='purple')[0]
+        }
+        self.robots_location_labels = {
+            # Agregar etiquetas para cada robot
+            'LR1':ax.text(0, 0, 'Robot 1', color='red', fontsize=12),
+            'LR2':ax.text(0, 0, 'Robot 2', color='blue', fontsize=12),
+            'LR3':ax.text(0, 0, 'Robot 3', color='green', fontsize=12),
+            'LR4':ax.text(0, 0, 'Robot 4', color='purple', fontsize=12)
+        }
         ax.set_title("Mapa General de Sensores")
         ax.set_xlabel("Eje X")
         ax.set_ylabel("Eje Y")
-        canvas = FigureCanvasTkAgg(figure, master=general_frame)
+        canvas = FigureCanvasTkAgg(self.figure, master=general_frame)
         canvas_widget = canvas.get_tk_widget()
         canvas_widget.pack(fill='both', expand=True, padx=5, pady=5)
 
@@ -165,6 +190,13 @@ class RobotInterface(tk.Tk):
         for col in ("Robot", "Sensor", "Valor"):
             general_data_table.heading(col, text=col)
         general_data_table.pack(fill='both', expand=True, padx=5, pady=5)
+    def update_robot_position(self,robot_id, x, y):
+        if robot_id in self.robots_location:
+            self.robots_location[robot_id].set_data([x], [y])  # Actualizar las coordenadas del punto
+            self.robots_location_labels[robot_id].set_position((x, y))
+            self.figure.canvas.draw()  # Redibujar el gráfico
+        else:
+            print(f"Robot ID {robot_id} no encontrado.")
 
         #socket_server.start_server()
     def start_connection(self):
@@ -199,9 +231,16 @@ class RobotInterface(tk.Tk):
                     if robot_id in self.robots:
                         robot = self.robots[robot_id]
                             
-                            # Llamar a la función correspondiente según el comando
-                        if command == "CE":
+                        # Llamar a la función correspondiente según el comando
+                        if command[:2] == "CC":
                             robot.connection()
+                        elif command[:2] == "SU":
+                            # Utilizar una expresión regular para encontrar los números
+                            coordinates = re.findall(r'\d+', command)
+                            x,y = list(map(int, coordinates))
+                            robot.update_location(x,y)
+                            self.update_robot_position('LR1',x,y)
+                            
                         else:
                             print(f"Comando desconocido para el robot {robot_id}: {command}")
                     else:
@@ -223,4 +262,4 @@ class RobotInterface(tk.Tk):
 if __name__ == "__main__":
 
     app = RobotInterface()
-    app.mainloop()
+    app.root.mainloop()
