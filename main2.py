@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 import pandas as pd
 import re
+import diccionario_sensores as dic
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 # Clase para la ventana de carga con animación de spinner
@@ -53,6 +54,7 @@ class BaseRobot:
         self.interface = interface
         self.loading_done = False  
         self.location = None
+        self.checkpoint = 0
         # Crear frame para el robot y agregarlo al notebook
         self.frame = tk.Frame(notebook, bg='white')
         notebook.add(self.frame, text=f"Robot {robot_id}")
@@ -90,21 +92,35 @@ class BaseRobot:
         canvas_widget = canvas.get_tk_widget()
         canvas_widget.pack(fill='both', expand=True, padx=5, pady=5)
         # Tabla de datos para el robot
-        self.data_table = ttk.Treeview(self.frame, columns=("Sensor", "Valor"), show='headings')
-        for col in ("Sensor", "Valor"):
+        # Crear un Treeview con scrollbar
+        self.data_table = ttk.Treeview(self.frame, columns=("ID", "Hora", "Sensor", "Valor"), show='headings', height=10)
+        for col in ("ID", "Hora", "Sensor", "Valor"):
             self.data_table.heading(col, text=col)
-        self.data_table.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # Crear scrollbar vertical
+        scrollbar = ttk.Scrollbar(self.frame, orient="vertical", command=self.data_table.yview)
+        self.data_table.configure(yscrollcommand=scrollbar.set)
+        
+        # Empaquetar Treeview y scrollbar
+        self.data_table.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+        scrollbar.pack(side='right', fill='y')
+
+        
+    def insert_data(self, Time, Sensor, Value):
+        self.data_table.insert("", "end", values=(f"{self.checkpoint}", f"{Time}",f"{Sensor}",f"{Value}"))
 
     def update_location(self,x,y):
-        self.location.set_data([x], [y])  # Actualizar las coordenadas del punto
-        self.figure.canvas.draw()  # Redibujar el gráfico
+        self.location.set_data([x], [y])  
+        self.figure.canvas.draw()  
     
-    def connection(self):
-        self.loading_done = False
-        self.connection_status = True
-        self.led_label.config(fg="green")
+    def connection(self,status):
+        self.connection_status = status
+        if status:
+            self.led_label.config(fg="green")
+        else:
+            self.led_label.config(fg="gray")
     
-    # Métodos de acción que se pueden sobrescribir para cada robot
+    # Funciones para solicitar informacion al robot
     def start_measurement(self):
         print(f"Robot {self.robot_id}: Solicitó Mediciones")
         self.interface.send_message_to_client(f"{self.robot_id}:IM")
@@ -125,17 +141,17 @@ class BaseRobot:
         print(f"Robot {self.robot_id}: Checar conexión")
         self.interface.send_message_to_client(f"{self.robot_id}:CC")
 
-# Ejemplo de subclase para un robot que se desempeña de manera especial
+# Subclase para un robot que se desempeña de manera especial
 class RobotEspecial(BaseRobot):
     def start_measurement(self):
         super().start_measurement()
         print(f"Robot Especial {self.robot_id}: Iniciando mediciones con parámetros especiales.")
-        # Aquí puedes agregar comportamientos adicionales o específicos
+       
 
 class RobotInterface():
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Interfaz de Control de Robots")
+        self.root.title("Panel de control para Robots")
         self.root.geometry("1000x700")
         self.root.configure(bg='white')
         self.server_socket = None
@@ -232,15 +248,19 @@ class RobotInterface():
                         robot = self.robots[robot_id]
                             
                         # Llamar a la función correspondiente según el comando
-                        if command[:2] == "CC":
-                            robot.connection()
-                        elif command[:2] == "SU":
+                        if command[:2] == "IC": #Iniciar comunicacion 
+                            robot.connection(True)
+                        elif command[:2] == "CC": #Cerrar comunicacion
+                            robot.connection(False)
+                        elif command[:2] == "AU": #Actualizar Ubicacion
                             # Utilizar una expresión regular para encontrar los números
-                            coordinates = re.findall(r'\d+', command)
+                            coordinates = re.findall(r'-?\d+', command)
                             x,y = list(map(int, coordinates))
                             robot.update_location(x,y)
-                            self.update_robot_position('LR1',x,y)
-                            
+                            self.update_robot_position('LR'+str(robot_id),x,y)
+                        elif command[:2] == "DS": #Dato sensor 
+                            #Nomeclatura ejemplo # 1:DSDC10000
+                            robot.insert_data("15:59","CO2",99)
                         else:
                             print(f"Comando desconocido para el robot {robot_id}: {command}")
                     else:
