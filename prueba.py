@@ -1,30 +1,59 @@
 import tkinter as tk
-import time
+from tkinter import ttk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-# Crear la ventana principal
-root = tk.Tk()
-root.geometry("400x300")
-root.title("Aplicación Principal")
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.frame = ttk.Frame(root)
+        self.frame.pack(fill='both', expand=True)
 
-# Crear la ventana de carga
-splash = tk.Toplevel()
-splash.geometry("300x200")
-splash.title("Cargando...")
+        # Crear el Treeview con scrollbar
+        self.data_table = ttk.Treeview(self.frame, columns=("Checkpoint", "Hora", "Sensor", "Valor"), show='headings', height=10)
+        for col in ("Checkpoint", "Hora", "Sensor", "Valor"):
+            self.data_table.heading(col, text=col)
+        
+        scrollbar = ttk.Scrollbar(self.frame, orient="vertical", command=self.data_table.yview)
+        self.data_table.configure(yscrollcommand=scrollbar.set)
+        
+        self.data_table.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+        scrollbar.pack(side='right', fill='y')
 
-# Etiqueta en la ventana de carga
-label = tk.Label(splash, text="Cargando, por favor espere...", font=("Helvetica", 16))
-label.pack(expand=True)
+        # Crear el botón para cambiar a gráficos
+        self.change_button = ttk.Button(root, text="Cambiar a gráficos", command=self.toggle_view)
+        self.change_button.pack(pady=10)
 
-# Función para cerrar la ventana de carga y mostrar la ventana principal
-def close_splash():
-    splash.destroy()
-    root.deiconify()
+        self.graph_frame = None
 
-# Ocultar la ventana principal mientras se muestra la ventana de carga
-root.withdraw()
+    def show_graph(self):
+        # Crear un nuevo frame para el gráfico
+        self.graph_frame = ttk.Frame(self.root)
+        self.graph_frame.pack(fill='both', expand=True)
 
-# Simular un tiempo de carga
-root.after(3000, close_splash)  # 3000 milisegundos = 3 segundos
+        # Crear una gráfica de barras con 6 barras
+        fig, ax = plt.subplots()
+        ax.bar([1, 2, 3, 4, 5, 6], [10, 20, 30, 40, 50, 60])
+        ax.set_title('Gráfico con 6 barras')
+        
+        canvas = FigureCanvasTkAgg(fig, master=self.graph_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side='left', fill='both', expand=True, padx=5, pady=5)
 
-# Iniciar el bucle principal de Tkinter
-root.mainloop()
+    def toggle_view(self):
+        if self.data_table.winfo_ismapped():
+            # Cambiar a gráfico
+            self.data_table.pack_forget()
+            self.show_graph()
+            self.change_button.config(text="Regresar a la tabla")
+        else:
+            # Cambiar a tabla
+            self.graph_frame.pack_forget()
+            self.graph_frame.destroy()
+            self.data_table.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+            self.change_button.config(text="Cambiar a gráficos")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()

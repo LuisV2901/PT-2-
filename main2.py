@@ -7,6 +7,7 @@ import re
 import diccionario_sensores as dic
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from datetime import datetime
 # Clase para la ventana de carga con animación de spinner
 class LoadingWindow:
     def __init__(self, parent, condition_func):
@@ -47,14 +48,13 @@ class LoadingWindow:
 
 # Clase base para los robots
 class BaseRobot:
-    def __init__(self, parent, notebook, robot_id, interface):
-        self.parent = parent  # Referencia a la ventana principal, si se necesita
+    def __init__(self, notebook, robot_id, interface):
         self.robot_id = robot_id
         self.led_state = False
         self.interface = interface
         self.loading_done = False  
         self.location = None
-        self.checkpoint = 0
+        self.checkpoint = 1
         # Crear frame para el robot y agregarlo al notebook
         self.frame = tk.Frame(notebook, bg='white')
         notebook.add(self.frame, text=f"Robot {robot_id}")
@@ -79,6 +79,10 @@ class BaseRobot:
         # LED simulado con un Label
         self.led_label = tk.Label(control_frame, text="●", fg="gray", bg='#002147', font=("Helvetica", 20))
         self.led_label.pack(side='left', padx=5, pady=5)
+
+        # LED simulado con un Label
+        self.battery_label = tk.Label(control_frame, text="Nivel de batería", fg="white", bg='#002147', font=("Helvetica", 12))
+        self.battery_label.pack(side='right', padx=5, pady=5)
         
         # Canvas de Matplotlib para el plano cartesiano
         self.figure, ax = plt.subplots()
@@ -93,8 +97,8 @@ class BaseRobot:
         canvas_widget.pack(fill='both', expand=True, padx=5, pady=5)
         # Tabla de datos para el robot
         # Crear un Treeview con scrollbar
-        self.data_table = ttk.Treeview(self.frame, columns=("ID", "Hora", "Sensor", "Valor"), show='headings', height=10)
-        for col in ("ID", "Hora", "Sensor", "Valor"):
+        self.data_table = ttk.Treeview(self.frame, columns=("Checkpoint", "Hora", "Sensor", "Valor"), show='headings', height=10)
+        for col in ("Checkpoint", "Hora", "Sensor", "Valor"):
             self.data_table.heading(col, text=col)
         
         # Crear scrollbar vertical
@@ -166,9 +170,9 @@ class RobotInterface():
         for i in self.id_robots:
             # En este ejemplo, se utiliza RobotEspecial para los robots pares
             if i % 2 == 0:
-                robot = RobotEspecial(self, self.notebook, i, self)
+                robot = RobotEspecial(self.notebook, i, self)
             else:
-                robot = BaseRobot(self, self.notebook, i, self)
+                robot = BaseRobot(self.notebook, i, self)
             self.robots[i] = robot
 
         # Pestaña para la Ventana General
@@ -260,7 +264,8 @@ class RobotInterface():
                             self.update_robot_position('LR'+str(robot_id),x,y)
                         elif command[:2] == "DS": #Dato sensor 
                             #Nomeclatura ejemplo # 1:DSDC10000
-                            robot.insert_data("15:59","CO2",99)
+                            hora_actual = datetime.now().strftime("%H:%M:%S")
+                            robot.insert_data(hora_actual,dic.Clave_sensores[f"{command[2:4]}"],command[4:])
                         else:
                             print(f"Comando desconocido para el robot {robot_id}: {command}")
                     else:
