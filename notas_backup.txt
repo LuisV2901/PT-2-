@@ -1,0 +1,53 @@
+        # self.host='localhost' 
+        # self.port=65432
+        # self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # self.server_socket.bind((self.host, self.port))
+        # self.server_socket.listen()
+        # print(f"Servidor escuchando en {self.host}:{self.port}...")
+        
+        # self.client_socket, self.addr = self.server_socket.accept()  # Espera a que un cliente se conecte
+        # print(f"Conectado con {self.addr}")
+        # threading.Thread(target=self.handle_client, args=(self.client_socket,), daemon=True).start()
+
+
+
+# try:    
+        #     with client_socket:
+        #         while True:
+        #             data = client_socket.recv(1024)
+        #             if not data:
+        #                 break
+        #             message = data.decode()
+        #             print(f"Recibido: {message}")
+        #             # Verifica si el mensaje tiene el formato correcto (ID:COMANDO)
+
+        #             robot_id, command = message.split(':')
+        #             robot_id = int(robot_id.strip())
+        #             command = command.strip()
+
+        #                 # Verificar que el ID del robot existe
+        #             if robot_id in self.robots:
+        #                 robot = self.robots[robot_id]
+                            
+        #                 # Llamar a la función correspondiente según el comando
+        #                 if command[:2] == "IC": #Iniciar comunicacion 
+        #                     robot.connection(True)
+        #                 elif command[:2] == "CC": #Cerrar comunicacion
+        #                     robot.connection(False)
+        #                 elif command[:2] == "AU": #Actualizar Ubicacion
+        #                     coordinates = re.findall(r'-?\d+', command)
+        #                     x,y = list(map(int, coordinates))
+        #                     robot.update_location(x,y)
+        #                     self.update_robot_position('LR'+str(robot_id),x,y)
+        #                 elif command[:2] == "MM":
+        #                     self.crear_interfaz(robot_id)
+        #                 elif command[:2] == "DS": #Dato sensor 
+        #                     hora_actual = datetime.now().strftime("%H:%M:%S")
+        #                     robot.insert_data(hora_actual,dic.Clave_sensores[f"{command[2:4]}"],command[4:])
+        #                 else:
+        #                     print(f"Comando desconocido para el robot {robot_id}: {command}")
+        #             else:
+        #                 print(f"ID de robot no válido: {robot_id}")
+                                             
+        # except Exception as e:
+        #     print(f"Error en la conexión con el cliente: {e}")
