@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nomenclatura de mensajes</title>
+    <style>
+        .section {
+            margin-bottom: 20px; /* Espacio entre secciones */
+        }
+    </style>
+</head>
+<body>
+    <h1>Mensajes enviados por la interfaz</h1>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Iniciar modo de mediciones ambientales:</h2>
+        <span style="font-size: 20px;">{ID}:MM</span>
+    </div>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Solicitar regreso de robots:</h2>
+        <span style="font-size: 20px;">{ID}:RR</span>
+    </div>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Solicitar Ubicación:</h2>
+        <span style="font-size: 20px;">{ID}:SU</span>
+    </div>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Iniciar control manual de robots:</h2>
+        <span style="font-size: 20px;">{ID}:MM donde se abrirá una ventana con botones y se mandarán:</span>
+    </div>
+    <ul>
+        <li><strong>Adelante activado:</strong> {ID}:WO</li>
+        <li><strong>Adelante desactivado:</strong> {ID}:WF</li>
+        <li><strong>Atrás activado:</strong> {ID}:SO</li>
+        <li><strong>Atrás desactivado:</strong> {ID}:SF</li>
+        <li><strong>Giro a la derecha activado:</strong> {ID}:DO</li>
+        <li><strong>Giro a la derecha desactivado:</strong> {ID}:DF</li>
+        <li><strong>Giro a la izquierda activado:</strong> {ID}:AO</li>
+        <li><strong>Giro a la izquierda desactivado:</strong> {ID}:AF</li>
+        <li><strong>Alto activado:</strong> {ID}:TO</li>
+        <li><strong>Alto desactivado:</strong> {ID}:TF</li>
+    </ul>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Checar conexión e información:</h2>
+        <span style="font-size: 20px;">{ID}:CC</span>
+    </div>
+
+    <h1>----------------------------------------------------------------</h1>
+    <h1>Mensajes recibidos en la interfaz</h1>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Comunicación iniciada con el robot:</h2>
+        <span style="font-size: 20px;">{ID}:IC</span>
+    </div>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Comunicación finalizada con el robot:</h2>
+        <span style="font-size: 20px;">{ID}:CC</span>
+    </div>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Mensaje con ubicación:</h2>
+        <span style="font-size: 20px;">{ID}:AU(%x,%y)  donde %x / %y es el número de ubicación y acepta números negativos</span>
+    </div>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Inicio de modo manual de movimientos:</h2>
+        <span style="font-size: 20px;">{ID}:MM</span>
+    </div>
+    <div class="section">
+        <h2 style="display: inline; font-size: 24px;">Datos recibidos de sensor:</h2>
+        <span style="font-size: 20px;">{ID}:DS seguido de 2 caracteres caracteristicos de cada sensor</span>
+        <ul>
+            <li><strong>CO2 (PPM):</strong> DC</li>
+            <li><strong>IRRADIANCIA (W/M2):</strong> IR</li>
+            <li><strong>TEMPERATURA (°C):</strong> TM</li>
+            <li><strong>HUMEDAD (%):</strong> HM</li>
+            <li><strong>CO (PPM):</strong> MC</li>
+            <li><strong>O3 (PPB):</strong> OZ</li>
+        </ul>
+
+        <span style="display: inline; font-size: 20px;">Finalizando con el valor del sensor, ejemplo: 4:DSTM50 (Robot 4 reporta Temperatura con valor de 50°C)</span>
+    
+    </div>
+</body>
+</html>

@@ -3,9 +3,9 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 
-def crear_interfaz():
+def crear_interfaz(ventana):
     # Crear la ventana principal
-    root = tk.Tk()
+    root = tk.Toplevel(ventana)
     root.title("Interfaz de Control")
 
     # Crear un marco para los botones
@@ -13,11 +13,11 @@ def crear_interfaz():
     frame.pack(pady=20)
 
     # Cargar imágenes
-    img_adelante = ImageTk.PhotoImage(Image.open("C:/Users/H563422/OneDrive - Honeywell/GitHub/TT-2/adelante.png"))
-    img_atras = ImageTk.PhotoImage(Image.open("C:/Users/H563422/OneDrive - Honeywell/GitHub/TT-2/atras.png"))
-    img_giro_derecha = ImageTk.PhotoImage(Image.open("C:/Users/H563422/OneDrive - Honeywell/GitHub/TT-2/derecha.png"))
-    img_giro_izquierda = ImageTk.PhotoImage(Image.open("C:/Users/H563422/OneDrive - Honeywell/GitHub/TT-2/izquierda.png"))
-    img_alto = ImageTk.PhotoImage(Image.open("C:/Users/H563422/OneDrive - Honeywell/GitHub/TT-2/parar.png"))
+    img_adelante = ImageTk.PhotoImage(Image.open("adelante.png"))
+    img_atras = ImageTk.PhotoImage(Image.open("atras.png"))
+    img_giro_derecha = ImageTk.PhotoImage(Image.open("derecha.png"))
+    img_giro_izquierda = ImageTk.PhotoImage(Image.open("izquierda.png"))
+    img_alto = ImageTk.PhotoImage(Image.open("parar.png"))
 
     # Definir comandos de los botones
     def adelante_press(event):
