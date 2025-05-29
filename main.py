@@ -5,59 +5,28 @@ import csv, re, serial, time, threading
 from datetime import datetime
 from tkinter import ttk, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
-
-# Clase para la ventana de carga con animación de spinner
-class LoadingWindow:
-    def __init__(self, parent, condition_func):
-        self.parent = parent
-        self.condition_func = condition_func  # Función que retorna True cuando se cumple la condición
-        self.top = tk.Toplevel(parent)
-        self.top.title("Cargando...")
-        width, height = 100, 100
-        # Calcular la posición para centrar la ventana
-        screen_width = self.top.winfo_screenwidth()
-        screen_height = self.top.winfo_screenheight()
-        x = int((screen_width / 2) - (width / 2))
-        y = int((screen_height / 2) - (height / 2))
-        self.top.geometry(f"{width}x{height}+{x}+{y}")
-        self.top.resizable(False, False)
-        self.top.transient(parent)
-
-        self.canvas = tk.Canvas(self.top, width=width, height=height)
-        self.canvas.pack()
-        # Crear un arco (spinner) de color rojo
-        self.arc = self.canvas.create_arc(10, 10, 90, 90, start=0, extent=90, outline="red", width=5, style=tk.ARC)
-        self.angle = 0
-
-        self.animate_spinner()
-
-    def animate_spinner(self):
-        # Actualiza el ángulo y redibuja el arco
-        self.angle = (self.angle + 10) % 360
-        self.canvas.itemconfig(self.arc, start=self.angle)
-        
-        if not self.condition_func():
-            # Si la condición no se ha cumplido, programa la siguiente actualización
-            self.top.after(50, self.animate_spinner)
-        else:
-            # Si se cumple la condición, cierra la ventana de carga
-            self.top.destroy()
+from progress import LoadingWindow
+import Interfaz_trayectorias
 
 # Clase base para los robots
 class BaseRobot:
     def __init__(self, notebook, robot_id, interface):
         self.interface = interface
-        self.connection_status = False
-        self.robot_id = robot_id
         self.led_state = False
-        self.loading_done = False  
-        self.location = None
-        self.checkpoint = 0
-        self.checkpoints = 0
-        self.battery = 0
+        self.loading_window = None  
+        self.checkpoints = {}
+        self.medicion = 0
+        self.mediciones = {}
         self.frame = tk.Frame(notebook, bg='white')
         notebook.add(self.frame, text=f"Robot {robot_id}")
+        self.ax = None
+        #Información general
+        self.connection_status = True
+        self.robot_id = robot_id
+        self.location = None
+        self.checkpoint = 0
+        self.battery = 0
+        
         self.robot_panel()
 
     def robot_panel(self):
@@ -84,13 +53,13 @@ class BaseRobot:
         self.battery_label.pack(side='right', padx=5, pady=5)
  
         # Canvas de Matplotlib para el plano cartesiano
-        self.figure, ax = plt.subplots()
-        ax.set_xlim(-30, 30)
-        ax.set_ylim(-30, 30)
-        self.location, = ax.plot(0, 0, 'ro')
-        ax.set_title(f"Posición del Robot {self.robot_id}")
-        ax.set_xlabel("Eje X")
-        ax.set_ylabel("Eje Y")
+        self.figure, self.ax = plt.subplots()
+        self.ax.set_xlim(-30, 30)
+        self.ax.set_ylim(-30, 30)
+        self.location, = self.ax.plot(0, 0, 'ro')
+        self.ax.set_title(f"Posición del Robot {self.robot_id}")
+        self.ax.set_xlabel("Eje X")
+        self.ax.set_ylabel("Eje Y")
         canvas = FigureCanvasTkAgg(self.figure, master=self.frame)
         canvas_widget = canvas.get_tk_widget()
         canvas_widget.pack(fill='both', expand=True, padx=5, pady=5)
@@ -120,10 +89,35 @@ class BaseRobot:
             font=("Helvetica", 10, "bold")
         )
         btn_generar_reportes.pack(pady=5)
+        btn_limpiar_tabla = tk.Button(
+            footer_frame,
+            text="Limpiar tabla",
+            command=self.clean, 
+            bg='#002147',
+            fg='white',
+            font=("Helvetica", 10, "bold")
+        )
+        btn_limpiar_tabla.pack(pady=5)
 
     # Funciones para actualizar informacion recibida por el robot
+    def update_ck(self,ck):
+        self.checkpoint = int(ck)
+        x_value, y_value = self.location.get_data()
+        self.checkpoints[int(ck)] = (x_value[0], y_value[0])
+        print(self.checkpoints)
+    
+    def clean(self):
+        for row in  self.data_table.get_children():
+            self.data_table.delete(row)
+            
     def update_battery_level(self,level):
         self.battery_label.config(text=f"Nivel de batería: {level}%")
+    
+    def increase_measure_count(self):
+        self.medicion+=1
+
+    def restart_measure_count(self):
+        self.medicion = 0
 
     def insert_data(self, Time, Sensor, Value):
         self.data_table.insert("", "end", values=(f"{self.checkpoint}", f"{Time}",f"{Sensor}",f"{Value}"))
@@ -151,10 +145,6 @@ class BaseRobot:
         entry_nombre = tk.Entry(forms, width=30)
         entry_nombre.pack()
 
-        tk.Label(forms, text="Autor:", bg='white').pack(pady=(10, 0))
-        entry_autor = tk.Entry(forms, width=30)
-        entry_autor.pack()
-
         tk.Label(forms, text="Comentarios:", bg='white').pack(pady=(10, 0))
         entry_comentarios = tk.Text(forms, width=30, height=4)
         entry_comentarios.pack()
@@ -162,7 +152,6 @@ class BaseRobot:
         # Botón de enviar
         def generate_report():
             nombre = entry_nombre.get()
-            autor = entry_autor.get()
             comentarios = entry_comentarios.get("1.0", "end").strip()
             columns = self.data_table["columns"]
                 # Abrir el archivo CSV para escritura
@@ -170,7 +159,6 @@ class BaseRobot:
 
                 writer = csv.writer(file)
                 writer.writerow([f"Robot: {self.robot_id}"])
-                writer.writerow([f"Autor: {autor}"])
                 writer.writerow([f"Comentarios: {comentarios}"])
                 writer.writerow(["========================"])
                 writer.writerow(columns)
@@ -185,12 +173,20 @@ class BaseRobot:
 
     
     # Funciones para solicitar informacion al robot
-
     def request(self, comando):
         if self.connection_status:
             if comando == "IM":
                 print(f"Robot {self.robot_id}: Solicitó Mediciones")
-                self.interface.send_message_to_client(self.robot_id,"IM")
+                interfaz = Interfaz_trayectorias.iniciar_interfaz_trayectorias(
+                    parent=self.frame,  # o el frame de Tk que estés usando como padre
+                    xmin=-100, xmax=0, ymin=-100, ymax=0,
+                    x0=-50, y0=-20, xc=-50, yc=0,
+                    fs=5
+                )# Luego, para obtener los puntos:
+                n,t = interfaz["obtener_parametros"]()
+                puntos = interfaz["obtener_puntos"]()
+                print(puntos)
+                # self.loading_window = LoadingWindow(self.frame,int(10),int(5))# Puedes cambiar el número aqu
             elif comando == "RR":
                 print(f"Robot {self.robot_id}: Regresar Robots")
                 self.interface.send_message_to_client(self.robot_id,"RR")
@@ -199,12 +195,18 @@ class BaseRobot:
                 self.interface.send_message_to_client(self.robot_id,"SU")
             elif comando == "MM":
                 print(f"Robot {self.robot_id}: Movimientos Manuales")
-                self.interface.send_message_to_client(self.robot_id,"MM")
+                #self.interface.send_message_to_client(self.robot_id,"MM")
+                self.ax.set_xlim(-50, 50)
+                self.ax.set_ylim(-50, 50)
+                self.figure.canvas.draw() 
             elif comando == "CK":
                 print(f"Robot {self.robot_id}: Checar conexión")
                 self.interface.send_message_to_client(self.robot_id,"CK")
         else:
             messagebox.showwarning("Error", "No hay conexion con el robot")
+    def add_event(self,ck,num):
+        if self.loading_window:
+            self.loading_window.increment_progress(ck,num)
 
 
 # Subclase para un robot que se desempeña de manera especial
@@ -219,15 +221,14 @@ class RobotInterface():
         self.root.title("Panel de control para Robots")
         self.root.geometry("1000x700")
         self.root.configure(bg='white')
-
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         # Configuración del puerto serial
-        SERIAL_PORT = 'COM6'  # Cambia esto según tu sistema
+        SERIAL_PORT = "" 
         BAUD_RATE = 115200
         self.ser = serial.Serial()
         self.ser.port = SERIAL_PORT
         self.ser.baudrate = BAUD_RATE
         self.ser.timeout = 1
-
         # Notebook para separar cada robot y la ventana general
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
@@ -363,43 +364,33 @@ class RobotInterface():
 
         # Definir comandos de los botones
         def adelante_press(event):
-            self.send_message_to_client(f"{robotID}:WO")
             print("Adelante presionado")
 
         def adelante_release(event):
-            self.send_message_to_client(f"{robotID}:WF")
             print("Adelante soltado")
 
         def atras_press(event):
-            self.send_message_to_client(f"{robotID}:SO")
             print("Atrás presionado")
 
         def atras_release(event):
-            self.send_message_to_client(f"{robotID}:SF")
             print("Atrás soltado")
 
         def giro_derecha_press(event):
-            self.send_message_to_client(f"{robotID}:DO")
             print("Giro a la derecha presionado")
 
         def giro_derecha_release(event):
-            self.send_message_to_client(f"{robotID}:DF")
             print("Giro a la derecha soltado")
 
         def giro_izquierda_press(event):
-            self.send_message_to_client(f"{robotID}:AO")
             print("Giro a la izquierda presionado")
 
         def giro_izquierda_release(event):
-            self.send_message_to_client(f"{robotID}:AF")
             print("Giro a la izquierda soltado")
 
         def alto_press(event):
-            self.send_message_to_client(f"{robotID}:TO")
             print("Alto presionado")
 
         def alto_release(event):
-            self.send_message_to_client(f"{robotID}:TF")
             print(f"Conexión movimientos manuales finalizada con robot {robotID}")
             ventana.destroy()
 
@@ -433,15 +424,49 @@ class RobotInterface():
         ventana.mainloop()
 
     def start_connection(self):
-        print("Iniciando comunicacion serial con ESP32")
+        print("Iniciando comunicacion serial")
         if not self.ser.is_open:
+            self.ser.port = self.port_entry.get()
             self.ser.open()
             print("Conectado al puerto serial\n")
+            # Esperar a que llegue "READY" del ESP32
+            ready = ""
+            while "READY" not in ready:
+                if self.ser.in_waiting:
+                    ready += self.ser.read(self.ser.in_waiting).decode(errors="ignore")
+                time.sleep(0.1)
+            time.sleep(2)
+            print("LoRa configurado")
             threading.Thread(target=self.handle_client, daemon=True).start()
             print("Buscando robots conectados")
-            self.send_message_to_client(0,"IC")
-        else:
-            print("Comunicacion con ESP32 ya iniciada")
+            # Crear ventana con botones
+            self.show_robot_buttons()
+
+
+    def show_robot_buttons(self):
+        button_window = tk.Toplevel(self.root)  # Asegúrate de que self.parent es tu ventana principal (tk.Tk())
+        button_window.title("Seleccionar robot")
+        width, height = 250, 250
+
+        screen_width = button_window.winfo_screenwidth()
+        screen_height = button_window.winfo_screenheight()
+        x = int((screen_width / 2) - (width / 2))
+        y = int((screen_height / 2) - (height / 2))
+
+        button_window.geometry(f"{width}x{height}+{x}+{y}")
+        button_window.resizable(True, True)
+
+        label = tk.Label(button_window, text="Selecciona un robot:")
+        label.pack(pady=10)
+
+        for i in range(1, 5):  # Botones del 1 al 4
+            btn = tk.Button(
+                button_window,
+                text=f"Robot {i}",
+                width=15,
+                command=lambda r=i: self.send_message_to_client(r, "IC")
+            )
+            btn.pack(pady=5)
 
     def handle_client(self):
         while self.ser.is_open:
@@ -477,28 +502,47 @@ class RobotInterface():
                                self.manual_movements_interface(address)
                             elif contenido[:2] == "DS": #Dato sensor 
                                 hora_actual = datetime.now().strftime("%H:%M:%S")
-                                robot.insert_data(hora_actual,dic.Clave_sensores[f"{contenido[2:4]}"],contenido[4:])
-                                clave = contenido[2:4]
-                                descripcion = dic.Clave_sensores[clave]
-                                self.general_data_table.insert("", "end", values=(f"{address}", f"{descripcion}", f"{contenido[4:]}"))
-
+                                # Busca todas las coincidencias de dos letras seguidas de un número (entero o decimal)
+                                datos = re.findall(r'([A-Z]{2})(\d+(?:\.\d+)?)', contenido[2:])
+                                resultado = {clave: float(valor) if '.' in valor else int(valor) for clave, valor in datos}
+                                # Mostrar resultados
+                                for clave, valor in resultado.items():
+                                    if robot.loading_window:
+                                        print(f"CK: {robot.checkpoint}, M: {robot.medicion}") 
+                                    print(f"{clave}: {valor}")
+                                    descripcion = dic.Clave_sensores[clave]
+                                    robot.insert_data(hora_actual,descripcion,valor)
+                                    self.general_data_table.insert("", "end", values=(f"{address}", f"{descripcion}", f"{valor}"))
+                                robot.increase_measure_count()
+                                robot.add_event(robot.checkpoint,robot.medicion)
                             elif contenido[:2] == "AU":
                                 x_match = re.search(r'X(-?\d+)', contenido)
-                                x_valor = x_match.group(1) if x_match else None
+                                x_valor = int(x_match.group(1)) if x_match else None
                                 
-                                y_match = re.search(r'Y(-?\d+)', contenido)
-                                y_valor = y_match.group(1) if y_match else None
+                                y_match = re.search(r'Y(-?\d+)', contenido) 
+                                y_valor = int(y_match.group(1)) if y_match else None
 
                                 robot.update_location(x_valor,y_valor)
                                 self.update_robot_position('LR'+str(address),x_valor,y_valor)
+
+                                if robot.loading_window:
+                                    robot.checkpoint+=1
+                                    robot.restart_measure_count()
+                            elif contenido[:2] == "BT":
+                                level = contenido[2:] 
+                                robot.update_battery_level(level)
+                            elif contenido[:2] == "CK":
+                                ck = contenido[2:]
+                                robot.update_ck(ck)
                             else:
                                 print(f"Comando desconocido para el robot {address}: {contenido}")
 
                         else:
-                            print(f"ESP32 (formato inválido): {line}")
+                            print(f"Serial: (formato inválido): {line}")
                     else:
-                        print(f"ESP32: {line}")
-
+                        print(f"Serial: {line}")
+                        if line == "+ERR=12":
+                            self.ser.write((f"AT+SEND?").encode())    
             except Exception as e:
                 print(f"Error al leer serial: {e}")
                 pass
@@ -511,10 +555,15 @@ class RobotInterface():
             if mensaje:
                 self.ser.write((f"AT+SEND={id},{len(mensaje)},{mensaje}").encode())
                 print(f"Mensaje enviado por la interfaz: {mensaje}")
-    
+    def on_closing(self):
+        plt.close('all')
+        self.root.destroy()
+
     def stop(self):
-        print("Cerrando comunicación serial con ESP32")
+        print("Cerrando comunicación serial")
         if self.ser.is_open:
+            for robot in self.robots:
+                self.robots[robot].connection(False)
             self.ser.close()
             print("Conexión cerrada correctamente\n")
         else:

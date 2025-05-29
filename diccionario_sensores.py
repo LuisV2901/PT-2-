@@ -4,5 +4,7 @@ Clave_sensores = {
     "TM" : "TEMPERATURA (°C)",
     "HM" : "HUMEDAD (%)",
     "MC" : "CO (PPM)",
-    "OZ" : "O3 (PPB)"
+    "OZ" : "O3 (PPB)",
+    "EO" : "eCO2 (PPM)",    
+    "TV" : "TVOC (PPB)"
 }

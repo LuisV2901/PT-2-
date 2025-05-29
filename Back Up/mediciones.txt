@@ -1,0 +1,28 @@
+                 # Crear nueva ventana de formulario
+                forms = tk.Toplevel(self.frame)
+                forms.title("Solicitud de mediciones")
+                forms.geometry("300x250")
+                forms.configure(bg='white')
+                # Etiquetas y campos de entrada
+                tk.Label(forms, text="Número de Checkpoints", bg='white').pack(pady=(10, 0))
+                entry_cks = tk.Entry(forms, width=30)
+                entry_cks.pack()
+                # Etiquetas y campos de entrada
+                tk.Label(forms, text="Tiempos de muestreos", bg='white').pack(pady=(10, 0))
+                entry_tm = tk.Entry(forms, width=30)
+                entry_tm.pack()
+                # Etiquetas y campos de entrada
+                tk.Label(forms, text="Número de muestras", bg='white').pack(pady=(10, 0))
+                entry_nm = tk.Entry(forms, width=30)
+                entry_nm.pack()
+
+                # Botón de enviar
+                def generate_report():
+                    cks = entry_cks.get()
+                    n = entry_nm.get()
+                    t = entry_tm.get()
+                    self.interface.send_message_to_client(self.robot_id,f"IMC{cks}T{t}N{n}")
+                    self.loading_window = LoadingWindow(self.frame,int(cks),int(n))# Puedes cambiar el número aquí
+                    forms.destroy()
+
+                tk.Button(forms, text="Enviar parámetros", command=generate_report, bg='#002147', fg='white').pack(pady=10)
