@@ -171,22 +171,28 @@ class BaseRobot:
 
         tk.Button(forms, text="Aceptar", command=generate_report, bg='#002147', fg='white').pack(pady=10)
 
-    
     # Funciones para solicitar informacion al robot
     def request(self, comando):
         if self.connection_status:
             if comando == "IM":
                 print(f"Robot {self.robot_id}: Solicitó Mediciones")
-                interfaz = Interfaz_trayectorias.iniciar_interfaz_trayectorias(
-                    parent=self.frame,  # o el frame de Tk que estés usando como padre
+                Trayectoria = Interfaz_trayectorias.VentanaTrayectorias(
+                    master=self.frame,
                     xmin=-100, xmax=0, ymin=-100, ymax=0,
                     x0=-50, y0=-20, xc=-50, yc=0,
-                    fs=5
-                )# Luego, para obtener los puntos:
-                n,t = interfaz["obtener_parametros"]()
-                puntos = interfaz["obtener_puntos"]()
-                print(puntos)
-                # self.loading_window = LoadingWindow(self.frame,int(10),int(5))# Puedes cambiar el número aqu
+                    fs=10
+                )
+                                
+                Trayectoria.root.wait_window()
+                
+                n = Trayectoria.muestrasn
+                t = Trayectoria.tiempo
+                puntos = Trayectoria.puntos_de_muestreo
+                for i, punto in enumerate(puntos):
+                    print(f"Checkpoint: {i}, Punto: ({punto[0]:.2f}, {punto[1]:.2f})")
+                self.loading_window = LoadingWindow(self.frame,len(puntos),n)
+                print(f"Tiempo total de muestreo {len(puntos)*t*n} segundos")
+
             elif comando == "RR":
                 print(f"Robot {self.robot_id}: Regresar Robots")
                 self.interface.send_message_to_client(self.robot_id,"RR")
