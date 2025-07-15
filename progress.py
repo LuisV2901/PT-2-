@@ -1,16 +1,18 @@
 import tkinter as tk
 
 class LoadingWindow:
-    def __init__(self, parent, cks, num):
+    def __init__(self, parent, cks, num,retry_ck_callback, retry_med_callback):
         self.parent = parent
         self.cks = cks
         self.num = num
-        self.max_count = cks*num
+        self.max_count = cks * num
         self.current_count = 0
+        self.retry_ck_callback = retry_ck_callback
+        self.retry_med_callback = retry_med_callback
 
         self.top = tk.Toplevel(parent)
         self.top.title("Progreso por evento")
-        width, height = 300, 150
+        width, height = 300, 300  # Aumentado el alto para nuevos botones
         screen_width = self.top.winfo_screenwidth()
         screen_height = self.top.winfo_screenheight()
         x = int((screen_width / 2) - (width / 2))
@@ -26,6 +28,14 @@ class LoadingWindow:
         self.canvas.pack(pady=10)
         self.progress_rect = self.canvas.create_rectangle(0, 0, 0, 20, fill="green")
 
+        # Botones nuevos
+        self.retry_ck_button = tk.Button(self.top, text="Reintentar Ck", command=self.retry_ck)
+        self.retry_ck_button.pack(pady=2)
+
+        self.retry_med_button = tk.Button(self.top, text="Reintentar Medición", command=self.retry_med)
+        self.retry_med_button.pack(pady=2)
+
+        # Botón de cerrar
         self.close_button = tk.Button(self.top, text="Cerrar", command=self.top.destroy)
         self.close_button.pack(pady=10)
         self.close_button.config(state="disabled")  # Desactivado hasta que se complete
@@ -41,3 +51,16 @@ class LoadingWindow:
         if self.current_count >= self.max_count:
             self.label.config(text="100% completado\n¡Proceso finalizado!")
             self.close_button.config(state="normal")
+
+    def Update_ck(self, ck, num):
+        percent = (self.current_count / self.max_count) * 100
+        self.label.config(text=f"{int(percent)}% completado de {self.max_count} mediciones\nCheckpoint {ck} de {self.cks}\nMedición {num} de {self.num}", font=("Arial", 12))
+        self.canvas.coords(self.progress_rect, 0, 0, 2 * percent, 20)
+
+    def retry_ck(self):
+        if self.retry_ck_callback:
+            self.retry_ck_callback()
+
+    def retry_med(self):
+        if self.retry_med_callback:
+            self.retry_med_callback()
