@@ -113,7 +113,7 @@ class VentanaTrayectorias:
         self.y0 = y0
         self.xc = xc
         self.yc = yc
-        self.fs = 0.2
+        self.fs = 3
 
         self.muestrasn = 0
         self.tiempo = 0

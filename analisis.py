@@ -1,13 +1,13 @@
 import pandas as pd
 import re
 import matplotlib.pyplot as plt
-from matplotlib import cm
 from matplotlib.widgets import Cursor
 import mplcursors
 import tkinter as tk
 from tkinter import filedialog
 
 def analizar_csv(archivo=None):
+    # Selección de archivo si no se proporciona
     if archivo is None:
         root = tk.Tk()
         root.withdraw()
@@ -17,19 +17,25 @@ def analizar_csv(archivo=None):
         )
         if not archivo:
             raise ValueError("No se seleccionó ningún archivo.")
-    df = pd.read_csv(archivo, encoding="latin1")
+
+    # Leer la primera línea para extraer el Robot ID
+    with open(archivo, 'r', encoding="latin1") as f:
+        primera_linea = f.readline()
+        match = re.search(r"Robot:\s*(\d+)", primera_linea)
+        robot_id = match.group(1) if match else "?"
+
+    # Cargar datos del CSV (saltando la primera línea)
+    df = pd.read_csv(archivo, encoding="latin1", skiprows=1)
 
     # Filtrar y renombrar columnas
     df = df[df.columns[:4]]
     df.columns = ["Checkpoint", "Hora", "Sensor", "Valor"]
 
-    # Limpiar y convertir columna Valor
+    # Limpiar columna "Valor"
     df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce")
-
-    # Eliminar filas sin coordenadas o valores
     df = df.dropna(subset=["Valor", "Checkpoint"])
 
-    # Extraer coordenadas (x, y) del Checkpoint
+    # Extraer coordenadas (x, y) desde la columna "Checkpoint"
     def extraer_coordenadas(cp):
         match = re.search(r"\(([\d\.]+),([\d\.]+)\)", cp)
         if match:
@@ -42,7 +48,7 @@ def analizar_csv(archivo=None):
     # Calcular estadísticas por punto y sensor
     stats = df.groupby(["x", "y", "Sensor"])["Valor"].agg(["min", "max", "mean"]).reset_index()
 
-    # Organizar datos para tooltips
+    # Agrupar info por coordenada
     datos_por_punto = {}
     for _, row in stats.iterrows():
         coord = (row["x"], row["y"])
@@ -52,26 +58,30 @@ def analizar_csv(archivo=None):
             f"{row['Sensor']}\n  Min: {row['min']:.2f}\n  Max: {row['max']:.2f}\n  Prom: {row['mean']:.2f}"
         )
 
-    # Graficar puntos
-    fig, ax = plt.subplots(figsize=(8, 8))
+    # Preparar puntos para graficar
     x_vals, y_vals = zip(*datos_por_punto.keys())
+
+    # Crear gráfico
+    fig, ax = plt.subplots(figsize=(8, 8))
     scatter = ax.scatter(x_vals, y_vals, c='dodgerblue', s=80)
 
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 10)
+    # Ajustar límites automáticamente con margen
+    margin = 1
+    ax.set_xlim(min(x_vals) - margin, max(x_vals) + margin)
+    ax.set_ylim(min(y_vals) - margin, max(y_vals) + margin)
+
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
-    ax.set_title("Mapa de mediciones")
+    ax.set_title(f"Mapa de mediciones - Robot {robot_id}")
+    ax.grid(True)
 
     # Tooltip interactivo
     cursor = mplcursors.cursor(scatter, hover=True)
-
     @cursor.connect("add")
     def on_add(sel):
         coord = (x_vals[sel.index], y_vals[sel.index])
         info = "\n\n".join(datos_por_punto[coord])
         sel.annotation.set(text=f"Punto: {coord}\n\n{info}", fontsize=8)
 
-    plt.grid(True)
     plt.tight_layout()
-    fig.show()
+    plt.show()
