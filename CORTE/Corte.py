@@ -1,4 +1,5 @@
 from Diccionario_modelos import modelos as Diccionario_modelos
+from Diccionario_modelos import marcas as Diccionario_marcas
 import pandas as pd
 
 class rollo:
@@ -178,13 +179,16 @@ print(f"Códigos de barras: {Nueva_habilitacion.codigos_barras}")\
 colores = Nueva_habilitacion.obtener_colores_rollos()
 tallas = Nuevo_corte.tallas
 data = []
-
+Barcodes = []
 for color in colores:
     fila = []
     for talla in tallas:
         cantidad_lienzos = sum(r.lienzos_usados for r in Nuevo_corte.rollos if r.color == color)
         cantidad = cantidad_lienzos * Nuevo_corte.valores_tallas[talla]
         fila.append(cantidad)
+        # Generar el barcode como un solo string y guardar junto con la cantidad
+        barcode = f"{Diccionario_marcas[Nuevo_corte.marca]['Barcode']}{Nuevo_corte.modelo}{color}{talla}"
+        Barcodes.append((barcode, cantidad))
     fila.append(sum(fila))  # Total por color (fila)
     data.append(fila)
 
@@ -204,7 +208,14 @@ df = pd.DataFrame(data, columns=columnas, index=index)
 print("\n--- MATRIZ DE UNIDADES POR TALLA Y COLOR ---")
 print(df)
 
+print("\n--- CÓDIGOS DE BARRAS GENERADOS ---")
+for barcode, cantidad in Barcodes:   
+    print(f"Barcode: {barcode}, Cantidad: {cantidad}")
 
+print("\n--- Metros de tela utilizados por color ---")
+for color, cantidad in Nueva_habilitacion.cantidad_por_color().items():
+    metros = cantidad * Nuevo_corte.largo_tendido
+    print(f"Color: {color}, Metros de tela utilizados: {metros} metros")
 
 
     
