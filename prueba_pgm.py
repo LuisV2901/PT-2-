@@ -1,4 +1,4 @@
-from cutpgm import seleccionar_y_recortar_mapa
+from Pruebas.cutpgm import seleccionar_y_recortar_mapa
 import yaml
 from PIL import Image
 import matplotlib.pyplot as plt

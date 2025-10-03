@@ -83,5 +83,5 @@ def analizar_csv(archivo=None):
         info = "\n\n".join(datos_por_punto[coord])
         sel.annotation.set(text=f"Punto: {coord}\n\n{info}", fontsize=8)
 
-    plt.tight_layout()
-    plt.show()
+    fig.tight_layout()
+    fig.show()

@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 import diccionario_sensores as dic
 import csv, re, serial, time, threading
 from datetime import datetime
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from progress import LoadingWindow
 import Interfaz_trayectorias
 from analisis import analizar_csv
-from cutpgm import seleccionar_y_recortar_mapa
+from Pruebas.cutpgm import seleccionar_y_recortar_mapa
 
 import yaml
 import os
@@ -46,6 +46,9 @@ class BaseRobot:
         self.checkpoints = {}
         self.puntos_muestreo = {}
         self.mediciones_completadas = False
+
+        self.origen_ini_x = 0
+        self.origen_ini_y = 0
         
     def _init_ui(self, notebook):
         """Configura la interfaz de usuario del robot"""
@@ -70,11 +73,11 @@ class BaseRobot:
         commands = [
             ("Iniciar Mediciones", "IM"),
             ("Regresar Robot", "RR"),
-            ("Solicitar Ubicación", "SU"),
+            #("Solicitar Ubicación", "SU"),
             ("Movimientos Manuales", "MM"),
             ("Información", "CK"),
             ("Solicitar Medicion", "RM"),
-            ("Definir puntos de muestreo", "TE"),
+            #("Definir puntos de muestreo", "TE"),
             ("Cerrar conexión", "CC")
         ]
         
@@ -82,15 +85,15 @@ class BaseRobot:
             tk.Button(control_frame, text=text, command=lambda c=cmd: self.request(c), 
                      **button_style).pack(side='left', padx=5, pady=5)
         
-        self.led_label = tk.Label(control_frame, text="●", fg="gray", 
+        self.led_label = tk.Label(control_frame, text="●", fg="green", 
                                  bg='#002147', font=("Helvetica", 20))
         self.led_label.pack(side='left', padx=5, pady=5)
         
-        self.battery_label = tk.Label(control_frame, text="Nivel de batería: 0%", 
+        self.battery_label = tk.Label(control_frame, text="Nivel de batería: 99%", 
                                     fg="white", bg='#002147', font=("Helvetica", 12))
         self.battery_label.pack(side='right', padx=5, pady=5)
         
-        self.time_label = tk.Label(control_frame, text="Tiempo: 00:00", 
+        self.time_label = tk.Label(control_frame, text="Tiempo: 5:29", 
                                   fg="white", bg='#002147', font=("Helvetica", 12))
         self.time_label.pack(side='right', padx=5, pady=5)
      
@@ -142,15 +145,14 @@ class BaseRobot:
         x_m, y_m = origin[0], origin[1]
         x_px = int(-x_m / resolution)
         y_px = int(alto - (-y_m / resolution))
+        
 
         # === REUTILIZAR FIGURA EXISTENTE EN VEZ DE CREAR UNA NUEVA ===
         self.ax.clear()  # Limpia el contenido actual del eje
 
         # Mostrar imagen y puntos
         self.ax.imshow(imagen, cmap='gray')
-        self.ax.scatter([x_px], [y_px], color='red', s=60, label="Origin")
         self.ax.set_title(f"Robot {self.robot_id} | Mapeo generado")
-        self.ax.legend()
         self.ax.set_xlim(0, ancho)
         self.ax.set_ylim(alto, 0)
         self.ax.set_xlabel("X (px)")
@@ -171,7 +173,16 @@ class BaseRobot:
         self.xmin = 0
         self.xmax = origin[0] + ancho * resolution
         self.ymin = 0
-        self.ymax = origin[1] + alto * resolution   
+        self.ymax = origin[1] + alto * resolution  
+
+
+        x_px_o = int((self.origen_ini_x - self.origin[0]) / self.resolution)
+        y_px_o = int(self.imagen_alto - ((self.origen_ini_y - self.origin[1]) / self.resolution))
+        #x_px_o = int((-x_m - self.origin[0]) / self.resolution)
+        #y_px_o = int(self.imagen_alto - ((-y_m - self.origin[1]) / self.resolution))
+        self.ax.scatter([x_px_o], [y_px_o], color='red', s=60, label="Origin")
+        self.ax.legend()
+        self.figure.canvas.draw_idle()
 
     def YAML_onclick(self,event):
         if not event.inaxes:
@@ -231,6 +242,7 @@ class BaseRobot:
         print(f"❌ Punto eliminado: ({eliminado_pix}) -> ({eliminado_mundo[0]:.2f}, {eliminado_mundo[1]:.2f})")
             
     def _create_data_table(self):
+        
         """Crea la tabla de datos para el robot"""
         self.data_table = ttk.Treeview(self.frame, columns=("Checkpoint", "Hora", "Sensor", "Valor"), show='headings', height=10)
         for col in ("Checkpoint", "Hora", "Sensor", "Valor"):
@@ -393,7 +405,7 @@ class BaseRobot:
                 writer = csv.writer(file)
                 writer.writerow([f"Robot: {self.robot_id}"])
                 writer.writerow([f"Comentarios: {comentarios}"])
-                writer.writerow(["xmin, xmax, ymin, ymax",f"({self.xmin},{self.xmax},{self.ymin},{self.ymax})"])
+                writer.writerow(["xmin, xmax, ymin, ymax",f"({int(self.xmin)},{int(self.xmax)},{int(self.ymin)},{int(self.ymax)})"])
                 writer.writerow(["========================"])
                 writer.writerow(columns)
                     
@@ -448,11 +460,11 @@ class BaseRobot:
                     else:
                         # Crear ventana Toplevel con el frame principal
                         ventana = tk.Toplevel(self.frame)
-                        ventana.title("Interfaz de Control")
+                        ventana.title("Puntos de muestreo")
                         ventana.geometry("400x300")
 
                         # Mostrar puntos
-                        tk.Label(ventana, text="Puntos de muestreo:").pack(pady=5)
+                        tk.Label(ventana, text=f"Puntos de muestreo para robot {self.robot_id}:").pack(pady=5)
 
                         text_puntos = tk.Text(ventana, height=8, wrap="none")
                         text_puntos.pack(padx=10, fill='both', expand=True)
@@ -498,9 +510,30 @@ class BaseRobot:
                 self.interface.send_message_to_client(self.robot_id,"/x0/y0/w0")
 
             elif comando == "TE":
-                print(f"Robot {self.robot_id}: Definir puntos de muestreo")
-                self.in_measurement = False
-                
+                if self.yaml != "":
+                    print(f"Robot {self.robot_id}: Definir puntos de muestreo")
+                    self.in_measurement = False
+                    """Limpia los puntos agregados al mapa sin borrar la imagen de fondo."""
+                    # Eliminar puntos agregados al gráfico
+                    for punto in self.puntos_plot:
+                        punto.remove()
+
+                    # Eliminar etiquetas si existen
+                    for etiqueta in self.etiquetas_puntos:
+                        etiqueta.remove()
+
+                    # Vaciar las listas
+                    self.puntos_pixeles.clear()
+                    self.puntos_mundo.clear()
+                    self.puntos_plot.clear()
+                    self.etiquetas_puntos.clear()
+
+                    # Redibujar
+                    self.figure.canvas.draw_idle()
+                else:
+                    print("Es necesario cargar un archivo YAML")
+
+
             elif comando == "SU":
                 print(f"Robot {self.robot_id}: Solicitar Ubicación")
                 self.interface.send_message_to_client(self.robot_id,"SU")
@@ -553,6 +586,27 @@ class BaseRobot:
                 self.interface.send_message_to_client(self.robot_id,"CK")
                 # Solicitar al usuario que introduzca los valores manualmente
                 #x_value = y_value = None
+                # Solicitar origen X
+                origen_x = simpledialog.askfloat(
+                    "Origen Inicial X",
+                    "Ingresa el valor del origen inicial en X (en metros):"
+                )
+                if origen_x is None:
+                    messagebox.showinfo("Cancelado", "Entrada cancelada por el usuario.")
+                    return
+
+                # Solicitar origen Y
+                origen_y = simpledialog.askfloat(
+                    "Origen Inicial Y",
+                    "Ingresa el valor del origen inicial en Y (en metros):"
+                )
+                if origen_y is None:
+                    messagebox.showinfo("Cancelado", "Entrada cancelada por el usuario.")
+                    return
+
+                # Guardar en atributos de la clase
+                self.origen_ini_x = origen_x
+                self.origen_ini_y = origen_y
                 self.zone = True
                 self._setup_plot_YAML()
             elif comando == "RM":
@@ -572,7 +626,7 @@ class BaseRobot:
         if not self.puntos_muestreo:
             raise ValueError("No se generaron puntos de muestreo.")
         if len(self.puntos_muestreo) >= 1:
-            self.loading_window = LoadingWindow(self.frame,len(self.puntos_muestreo),self.n, retry_ck_callback=self.reintentar_ck,  retry_med_callback=self.reintentar_med)
+            self.loading_window = LoadingWindow(self.robot_id,self.frame,len(self.puntos_muestreo),self.n, retry_ck_callback=self.reintentar_ck,  retry_med_callback=self.reintentar_med)
         print(f"Tiempo total de muestreo {len(self.puntos_muestreo)*self.t*self.n} segundos")
         self.sent_xy(self.puntos_muestreo[self.checkpoint][0],self.puntos_muestreo[self.checkpoint][1],0)
         self.in_measurement = True
@@ -628,45 +682,6 @@ class BaseRobot:
         except Exception as e:
             messagebox.showerror("Error", "Debes introducir valores numéricos para X e Y.")
             return
-
-    def Map_data_from_yaml(self):
-        """Carga los datos del mapa desde un archivo YAML y recorta la imagen del mapa"""
-        ruta_yaml = seleccionar_y_recortar_mapa()
-        print(f"Ruta del YAML: {ruta_yaml}")
-        xmin = float(f"{ruta_yaml['xmin']:.2f}")
-        xmax = float(f"{ruta_yaml['xmax']:.2f}")
-        ymin = float(f"{ruta_yaml['ymin']:.2f}")
-        ymax = float(f"{ruta_yaml['ymax']:.2f}")
-        self.zone = True
-        self.update_location(0,0)
-        self.update_limits(xmin, xmax, ymin, ymax)       
-        """if ruta_yaml is None:
-            return
-
-        # Leer el archivo .yaml
-        with open(ruta_yaml, 'r') as f:
-            config = yaml.safe_load(f)
-
-        image_rel_path = config["image"]
-        resolution = config["resolution"]
-        origin = config["origin"]
-
-        # Obtener ruta absoluta del .pgm
-        dir_yaml = os.path.dirname(ruta_yaml)
-        ruta_imagen = os.path.join(dir_yaml, image_rel_path)
-
-        # Cargar imagen
-        imagen = Image.open(ruta_imagen)
-        ancho, alto = imagen.size
-
-        # Recortar la imagen y obtener los puntos
-        recorte_info = recortar_imagen(imagen, resolution, origin, ancho, alto, ruta_yaml, ruta_imagen)
-        
-        if recorte_info is not None:
-            self.update_limits(recorte_info['xmin'], recorte_info['xmax'], recorte_info['ymin'], recorte_info['ymax'])
-            #self.update_location((recorte_info['xmin'] + recorte_info['xmax']) / 2, (recorte_info['ymin'] + recorte_info['ymax']) / 2)
-            self.zone = True
-        """
 
     def add_event(self,ck,num):
         if self.loading_window:
@@ -809,7 +824,7 @@ class RobotInterface():
 
         # Diccionario para almacenar los robots
         self.robots = {}  
-        self.id_robots = [1, 2, 3, 4]
+        self.id_robots = [1, 2, 3]
         self.loras = {}  
         self.id_loras = [1, 2]
 
@@ -871,10 +886,10 @@ class RobotInterface():
             self.loras[i] = lora
 
         for i in self.id_robots:
-            if i == 1 or i == 2 or i == 3:
+            if i == 1 or i == 2:
                 robot = BaseRobot(self.notebook, i, self, 1)
             else:
-                robot = RobotEspecial(self.notebook, i, self, 2)
+                robot = BaseRobot(self.notebook, i, self, 2)
             self.robots[i] = robot
 
     def _setup_plot(self):
@@ -913,17 +928,7 @@ class RobotInterface():
     def _create_footer(self):
         footer_frame = tk.Frame(self.general_frame, bg='white')
         footer_frame.pack(fill='x', pady=10)
-
-        btn_generar_reportes = tk.Button(
-            footer_frame,
-            text="Generar Reportes",
-            command=self.create_reports, 
-            bg='#002147',
-            fg='white',
-            font=("Helvetica", 10, "bold")
-        )
-        btn_generar_reportes.pack(pady=5)
-
+  
         btn_limpiar_tabla = tk.Button(
             footer_frame,
             text="Limpiar tabla",
@@ -1430,7 +1435,7 @@ class RobotInterface():
                 valores_str += f"{descripcion:<{col_width}}{valor:<{col_width}}\n"
             messagebox.showinfo("Valores obtenidos", f"Robot {address}:\n{valores_str}")
 
-        if robot.in_measurement == True and robot.complete_measurement == True:
+        elif robot.in_measurement == True and robot.complete_measurement == True:
             messagebox.showinfo(
                     message=f"Medición del CK {robot.checkpoint} completada, enviando al nuevo",
                     title="Medición completada"
@@ -1441,7 +1446,7 @@ class RobotInterface():
             robot.complete_measurement = True
 
         #if robot.loading_window and robot.complete_measurement == False and robot.medicion <= robot.n:
-        if robot.in_measurement == True and robot.complete_measurement == False:
+        elif robot.in_measurement == True and robot.complete_measurement == False:
 
             for clave, valor in resultado.items():
                 print(f"{clave}: {valor}")
@@ -1471,18 +1476,18 @@ class RobotInterface():
                             message=f"Medición del CK {robot.checkpoint} completada, no hay más puntos de muestreo\nRegresando al punto de inicio robot {robot.robot_id}",
                             title=f"Medición completada del robot {robot.robot_id}"
                         )
-                    robot.sent_xy(0,0,0)
                     #robot.loading_window.Update_ck(robot.checkpoint,robot.medicion)
                     robot.complete_measurement = False
-                    robot.in_measurement == False
+                    robot.in_measurement = False
                     lora_obj = self.loras[robot.LoRa]
                     lora_obj.set_mensajeenviado(False)
                     lora_obj.set_respuesta(False)
-                    robot.complete_measurement = False
                     robot.mediciones = {}
                     robot.checkpoints = {}
                     robot.puntos_muestreo = {}
-                    robot.mediciones_completadas = False
+                    robot.sent_xy(robot.origen_ini_x,robot.origen_ini_y,0)
+                    robot.checkpoint = 0
+                    print("Terminaron las medidas")
         
 
     #  Actualiza la ubicación del robot y muestra los errores si los hay
@@ -1524,7 +1529,7 @@ class RobotInterface():
         
         if isinstance(x_valor, float) and isinstance(y_valor, float) and contenido[2:4] != "E1":
             robot.update_location(x_valor,y_valor)
-            robot.eliminar_punto(robot.checkpoint)
+            #robot.eliminar_punto(robot.checkpoint)
             self.update_robot_position('LR'+str(address),x_valor,y_valor)
 
             if  robot.in_measurement == True and robot.checkpoint == 0 and robot.complete_measurement == False:
@@ -1534,7 +1539,7 @@ class RobotInterface():
                 robot.loading_window.Update_ck(robot.checkpoint,robot.medicion)
                 print(f"CK: {robot.checkpoint}, M: {robot.medicion}")
 
-            if robot.in_measurement == True and robot.complete_measurement == True:
+            elif robot.in_measurement == True and robot.complete_measurement == True:
                 robot.restart_measure_count()
                 self.send_message_to_client(robot.robot_id, "RM")
                 robot.update_ck(robot.checkpoint+1)

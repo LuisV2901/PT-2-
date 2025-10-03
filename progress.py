@@ -1,7 +1,8 @@
 import tkinter as tk
 
 class LoadingWindow:
-    def __init__(self, parent, cks, num,retry_ck_callback, retry_med_callback):
+    def __init__(self,robot_id, parent, cks, num,retry_ck_callback, retry_med_callback):
+        self.robot_id = robot_id
         self.parent = parent
         self.cks = cks
         self.num = num
@@ -11,7 +12,7 @@ class LoadingWindow:
         self.retry_med_callback = retry_med_callback
 
         self.top = tk.Toplevel(parent)
-        self.top.title("Progreso por evento")
+        self.top.title(f"Progreso por evento Robot {self.robot_id}")
         width, height = 300, 300  # Aumentado el alto para nuevos botones
         screen_width = self.top.winfo_screenwidth()
         screen_height = self.top.winfo_screenheight()

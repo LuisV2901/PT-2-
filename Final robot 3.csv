@@ -1,0 +1,11 @@
+Robot: 3,,,
+Comentarios: ,,,
+"xmin, xmax, ymin, ymax","(0,47,0,39.1)",,
+========================,,,
+Checkpoint,Hora,Sensor,Valor
+"CK:1 (15.5,1.5)",13:51:46,CO2 (PPM),438
+"CK:1 (15.5,1.5)",13:51:46,TEMPERATURA (°C),32.74
+"CK:1 (15.5,1.5)",13:51:46,HUMEDAD (%),31.48
+"CK:1 (15.5,1.5)",13:51:46,IRRADIANCIA (W/M2),767.4
+"CK:1 (15.5,1.5)",13:51:46,eCO2 (PPM),416
+"CK:1 (15.5,1.5)",13:51:46,TVOC (PPB),0
